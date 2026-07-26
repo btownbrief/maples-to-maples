@@ -125,7 +125,9 @@ textarea:focus, input:focus { outline: 2px solid var(--accent); border-color: tr
 #deck-wrap { position: relative; }
 #deck {
   position: relative; height: min(46vh, 380px);
-  touch-action: pan-x;
+  /* pan-y: the browser keeps vertical page scroll; horizontal drags belong
+     to the deck's pointer events (pan-x would let the browser claim them) */
+  touch-action: pan-y;
 }
 .card {
   position: absolute; inset: 0;
