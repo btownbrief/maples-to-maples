@@ -1,0 +1,49 @@
+name: Pending answer notifications
+
+# Every 2 hours: if reader answers are waiting for review, open a GitHub
+# issue (GitHub emails the repo owner about new issues — that's the
+# notification). When the queue is clear again, close the issue.
+# Offset from caption-this's schedule so the two never collide.
+
+on:
+  schedule:
+    - cron: '53 */2 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  issues: write
+
+env:
+  SUPABASE_URL: https://jnouvwxomrcffqwilqkq.supabase.co
+  SUPABASE_ANON_KEY: sb_publishable_RkMJQopffWlV6DSwCRkndQ_Xw6GJMf3
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check pending count and manage notification issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          COUNT=$(curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/m2m_get_pending_count" \
+            -H "apikey: $SUPABASE_ANON_KEY" -H "Content-Type: application/json" -d '{}')
+          echo "Pending answers: $COUNT"
+          gh label create answer-approval --color 2E7D43 \
+            --description "Reader answers waiting for review" 2>/dev/null || true
+          ISSUE=$(gh issue list --label answer-approval --state open \
+            --json number --jq '.[0].number // empty')
+          if [ "$COUNT" -gt 0 ] && [ -z "$ISSUE" ]; then
+            BODY=$(printf '%s\n\n%s\n\n%s' \
+              "Reader answer(s) are waiting in the review queue." \
+              "**Review them here → https://play.btownbrief.com/maples-to-maples/admin.html**" \
+              "This issue closes itself automatically once the queue is clear.")
+            gh issue create --label answer-approval \
+              --title "🍁 $COUNT answer(s) waiting for approval" \
+              --body "$BODY"
+          elif [ "$COUNT" -eq 0 ] && [ -n "$ISSUE" ]; then
+            gh issue close "$ISSUE" --comment "Queue is clear 🎉"
+          else
+            echo "Nothing to do."
+          fi

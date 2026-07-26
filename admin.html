@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14212e">
+<title>MAPLES TO MAPLES — Editor's Desk</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="admin">
+<div id="app">
+  <header id="topbar">
+    <div id="logo">🗝️ EDITOR'S <span>DESK</span></div>
+    <button class="linkish" id="lock-btn">lock</button>
+  </header>
+
+  <main id="views">
+    <!-- passphrase gate -->
+    <section id="gate" class="view">
+      <div class="notice">
+        <div class="big">🔐</div>
+        <p>Editor access only.</p>
+      </div>
+      <input type="password" id="pass-input" placeholder="Admin passphrase" autocomplete="current-password">
+      <div style="height:10px"></div>
+      <button class="btn primary" id="pass-go" style="width:100%">Unlock</button>
+      <div class="hint" id="gate-status"></div>
+    </section>
+
+    <!-- dashboard -->
+    <section id="dash" class="view hidden">
+      <div class="admin-section">
+        <h2 class="section-title">📮 Pending answers <span class="badge hidden" id="pending-badge"></span></h2>
+        <div id="pending-list"></div>
+        <div class="hint hidden" id="pending-empty">Queue is clear — nothing waiting. ☕</div>
+        <div class="admin-actions hidden" id="approve-all-wrap">
+          <button class="btn good" id="btn-approve-all">✅ Approve all pending</button>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <h2 class="section-title">🟢 Live round</h2>
+        <div id="live-card"></div>
+        <div class="admin-actions" id="live-actions">
+          <button class="btn ghost" id="btn-open-voting">Close answers → start judging</button>
+          <button class="btn danger" id="btn-end-round">End round now</button>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <h2 class="section-title">🟩 Green card queue</h2>
+        <textarea id="card-text" maxlength="120" rows="2"
+          placeholder="Write next week's green card… (e.g. “The real mayor of Church Street”)"></textarea>
+        <div class="form-row">
+          <span id="card-chars" class="hint">120</span>
+          <button class="btn primary" id="card-add">Add to queue 🟩</button>
+        </div>
+        <div id="queue-list"></div>
+        <div class="hint hidden" id="queue-empty">Queue is empty — write some green cards so Monday has a star. 😬</div>
+      </div>
+
+      <div class="admin-section">
+        <h2 class="section-title">🃏 In the deck (approved)</h2>
+        <div id="approved-list"></div>
+        <div class="hint hidden" id="approved-empty">No approved answers yet.</div>
+      </div>
+
+      <button class="btn ghost" id="refresh-btn" style="width:100%">↻ Refresh</button>
+    </section>
+  </main>
+
+  <footer id="foot">
+    A Btown Games production · <a href="index.html">→ back to the game</a>
+  </footer>
+  <div id="toast" class="hidden"></div>
+</div>
+<script type="module" src="js/admin.js"></script>
+</body>
+</html>
