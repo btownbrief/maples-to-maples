@@ -59,6 +59,14 @@ body {
 .notice.mini { padding: 12px; font-size: 14px; color: var(--good); }
 .notice .big { font-size: 42px; margin-bottom: 10px; }
 .notice p { margin: 6px 0; }
+/* Empty states get a barely-there Burlington backdrop: Green Mountains
+   ridgelines over Lake Champlain (static inline SVG — nothing animates,
+   so prefers-reduced-motion needs no special case). */
+#round-none, #round-upcoming, #results-none, #deck-empty {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 520 130' preserveAspectRatio='none'%3E%3Cpath fill='%231c3040' d='M0 78 L45 52 L95 72 L150 40 L205 70 L260 50 L315 74 L365 46 L420 68 L470 54 L520 72 L520 96 L0 96 Z'/%3E%3Cpath fill='%231b3532' d='M0 92 L60 68 L120 88 L190 60 L250 84 L320 64 L390 88 L450 70 L520 88 L520 96 L0 96 Z'/%3E%3Crect y='96' width='520' height='34' fill='%23132a3d'/%3E%3Cg fill='%239db2c4' fill-opacity='.06'%3E%3Crect x='70' y='105' width='96' height='2' rx='1'/%3E%3Crect x='300' y='112' width='140' height='2' rx='1'/%3E%3Crect x='190' y='120' width='70' height='2' rx='1'/%3E%3C/g%3E%3C/svg%3E") bottom center / 100% 130px no-repeat;
+  border-radius: var(--radius);
+  padding-bottom: 110px;
+}
 .linkish {
   background: none; border: none; color: var(--accent);
   font: inherit; text-decoration: underline; cursor: pointer; padding: 0;
@@ -73,11 +81,13 @@ body {
 .phase-banner.vote { color: var(--good); border-color: rgba(69, 212, 131, .35); }
 
 /* ---------------- the green card ---------------- */
+/* Styled like a Church Street street blade: green field, white uppercase
+   lettering, and the inset white keyline every US street sign wears. */
 .green-card {
   background: linear-gradient(160deg, var(--green-card), var(--green-deep));
   border: 1px solid rgba(255, 255, 255, .14);
   border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+  box-shadow: inset 0 0 0 2px rgba(247, 251, 240, .55), 0 8px 24px rgba(0, 0, 0, .35);
   padding: 26px 20px 28px;
   text-align: center;
   font-size: 24px; font-weight: 800; line-height: 1.25;
@@ -132,7 +142,10 @@ textarea:focus, input:focus { outline: 2px solid var(--accent); border-color: tr
 .card {
   position: absolute; inset: 0;
   border-radius: var(--radius); overflow: hidden;
-  background: var(--paper);
+  /* cream card stock with a faint maple-leaf watermark (inline SVG tile) */
+  background-color: var(--paper);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='88' height='88' viewBox='0 0 88 88'%3E%3Cg fill='%23c0392b' fill-opacity='.05'%3E%3Cpath transform='translate(12 10) rotate(-14 16 16)' d='M16 1.5 L18.2 7 L21 5.2 L19 10.2 L27 7.5 L24 12 L30 13.5 L21.5 16 L27.5 20.5 L19.5 20 L21.5 25.5 L17 22.5 L16.8 30 L15.2 30 L15 22.5 L10.5 25.5 L12.5 20 L4.5 20.5 L10.5 16 L2 13.5 L8 12 L5 7.5 L13 10.2 L11 5.2 L13.8 7 Z'/%3E%3Cpath transform='translate(52 50) rotate(18 16 16)' d='M16 1.5 L18.2 7 L21 5.2 L19 10.2 L27 7.5 L24 12 L30 13.5 L21.5 16 L27.5 20.5 L19.5 20 L21.5 25.5 L17 22.5 L16.8 30 L15.2 30 L15 22.5 L10.5 25.5 L12.5 20 L4.5 20.5 L10.5 16 L2 13.5 L8 12 L5 7.5 L13 10.2 L11 5.2 L13.8 7 Z'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 88px 88px;
   color: var(--paper-ink);
   box-shadow: 0 10px 26px rgba(0, 0, 0, .45);
   user-select: none; -webkit-user-select: none;
