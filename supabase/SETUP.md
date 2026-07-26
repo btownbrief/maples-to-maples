@@ -1,5 +1,16 @@
 # MAPLES TO MAPLES — backend setup (one time, ~5 minutes)
 
+> ## Update 2026-07-26 — already set up? Run one migration
+>
+> If you ran the schema before this date, paste the whole of
+> [`MIGRATION-2026-07-26.sql`](MIGRATION-2026-07-26.sql) into the SQL Editor
+> once and click **Run** (safe to re-run). It closes a moderation gap:
+> edited answers now go back to review when the **name** changes, not just
+> the text. The schema's admin-passphrase seed also changed (fresh installs
+> now start locked with a random hash) — that needs **no** action from you,
+> because your real passphrase is already set and this seed can never
+> overwrite it. New installs just follow the steps below as usual.
+
 This game extends the existing **btown-games** Supabase project (the same
 one the arcade leaderboard and CAPTION THIS use). It adds its own `m2m_*`
 tables and functions and **does not touch the caption-this or scores

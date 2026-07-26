@@ -214,8 +214,10 @@ begin
 end $$;
 
 -- Upsert the player's single answer for the live card (answer phase only).
--- Edits during the answer phase are allowed, but a changed answer goes back
--- to 'pending' for another look from the editor.
+-- Edits during the answer phase are allowed, but any change — to the answer
+-- text OR the public display name — goes back to 'pending' for another look
+-- from the editor (otherwise an approved player could swap in an abusive
+-- name and keep their approved status).
 create or replace function public.m2m_submit_answer(
   p_card uuid, p_player uuid, p_token text, p_name text, p_text text
 ) returns void
@@ -242,6 +244,7 @@ begin
   on conflict (card_id, player_id) do update
     set text = excluded.text, name = excluded.name, created_at = now(),
         status = case when m2m_answers.text = excluded.text
+                       and m2m_answers.name = excluded.name
                       then m2m_answers.status else 'pending' end
     where m2m_answers.token = excluded.token;  -- only the owning device edits
 end $$;
