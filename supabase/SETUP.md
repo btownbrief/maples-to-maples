@@ -30,6 +30,9 @@ the repo — it's public.
 
 ## 3. Load the starter green cards (optional but recommended)
 
+> ⚠️ Steps run in order — this one fails with
+> `relation "public.m2m_cards" does not exist` if step 1 hasn't run yet.
+
 Paste this into the SQL Editor and click **Run** to queue the 12 launch
 cards from `data/green-cards.md` (they go live one per week, in order —
 edit the list first if you like):
