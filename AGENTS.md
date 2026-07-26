@@ -40,6 +40,11 @@ the public anon key can **only** call the security-definer RPCs in
 the admin passphrase in client JS or commit it — the passphrase is checked
 server-side by design.
 
+Vote integrity is **one vote per local player identity (per browser)** — the
+client-minted `btown-*` UUID + token in `js/api.js`. Clearing storage mints a new
+voter; that's the same accepted small-community tradeoff as the arcade leaderboards.
+Don't add auth/accounts to "fix" it unless Stephen explicitly asks.
+
 ## Before you finish
 Run `node scripts/test-rounds.mjs` — plain Node, no framework, must pass. If you
 changed RPC calls or the round lifecycle, walk the weekly flow (answer → approve →

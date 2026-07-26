@@ -20,6 +20,13 @@ it from `admin.html` — nothing appears publicly unmoderated. The editor
 also writes and queues future green cards from the same desk; each Monday
 pulls the next card in line.
 
+Voting is **one vote per local player identity (per browser)**: the same
+`btown-*` id + token minted in `js/api.js` that names you on every arcade
+leaderboard. Clearing browser storage mints a fresh voter, so a determined
+person could vote again — the same honor-system tradeoff the fleet accepts
+for its leaderboards, and the right size for a small community game. There
+are no accounts, by design.
+
 ## Architecture
 
 Plain static site — no build step. `index.html` + `style.css` + ES modules
