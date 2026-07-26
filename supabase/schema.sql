@@ -73,8 +73,10 @@ create table if not exists public.m2m_admin_config (
   pass_hash text not null
 );
 
--- Seeds a throwaway passphrase on a FRESH database only. "do nothing" means
--- re-running this file can never clobber the live passphrase.
+-- Seeds a random, unrecoverable placeholder hash on a FRESH database only —
+-- nobody (including you) can log in until you set a real passphrase in
+-- SETUP.md step 2. "do nothing" means re-running this file can never clobber
+-- the live passphrase.
 --
 -- Never put the real passphrase in this file — the repo is public. To set or
 -- rotate it, paste this into the Supabase SQL editor instead (bare crypt() is
@@ -85,7 +87,7 @@ create table if not exists public.m2m_admin_config (
 --   on conflict (id) do update set pass_hash = excluded.pass_hash;
 --
 insert into public.m2m_admin_config (pass_hash)
-values (extensions.crypt('CHANGE-ME-VIA-SQL-EDITOR', extensions.gen_salt('bf')))
+values (extensions.crypt(gen_random_uuid()::text, extensions.gen_salt('bf')))
 on conflict (id) do nothing;
 
 -- Lock everything down: anon can only use the functions below.
