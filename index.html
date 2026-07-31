@@ -38,7 +38,7 @@
       <!-- answer phase -->
       <div id="round-answer" class="hidden">
         <div class="phase-banner">🍁 Answers open · judging starts Wed noon</div>
-        <div class="green-card">
+        <div class="green-card hero-card">
           <div class="green-label">this week's green card</div>
           <div id="green-prompt"></div>
         </div>
@@ -58,10 +58,11 @@
       <!-- vote phase -->
       <div id="round-vote" class="hidden">
         <div class="phase-banner vote">🔥 Judging is ON · results Monday</div>
-        <div class="green-card slim">
+        <div class="green-card slim judging-prompt">
           <div class="green-label">the green card</div>
           <div id="vote-prompt"></div>
         </div>
+        <div class="deadline" id="vote-deadline"></div>
         <div id="deck-wrap">
           <div id="deck"></div>
           <div id="deck-empty" class="notice hidden">
@@ -74,7 +75,13 @@
           <button class="swipe-btn undo" id="btn-undo" aria-label="Undo last vote" disabled>↩️</button>
           <button class="swipe-btn yep" id="btn-yep" aria-label="Pick">🍁</button>
         </div>
-        <div id="vote-progress"></div>
+        <div id="vote-progress">
+          <div id="vote-progress-label">Loading the deck…</div>
+          <div id="vote-progress-track" role="progressbar" aria-label="Answers judged"
+            aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+            <div id="vote-progress-fill"></div>
+          </div>
+        </div>
         <div class="hint">Swipe right 🍁 if it's a keeper, left 👎 if it's a groaner.</div>
       </div>
 
@@ -101,7 +108,7 @@
         <ol id="results-list"></ol>
 
         <div id="archive-section" class="hidden">
-          <h2 class="section-title">Past weeks</h2>
+          <h2 class="section-title">🍁 Hall of Fame</h2>
           <ul id="archive-list"></ul>
         </div>
       </div>
@@ -127,7 +134,7 @@
     </div>
   </div>
 
-  <div id="toast" class="hidden"></div>
+  <div id="toast" class="hidden" role="status" aria-live="polite"></div>
 </div>
 <script type="module" src="js/main.js"></script>
 <script src="https://play.btownbrief.com/ticker.js" defer></script>
