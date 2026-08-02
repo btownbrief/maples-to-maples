@@ -5,7 +5,7 @@
 // scrapped rounds, and the immutability rule.
 import {
   createParty, judgeIndex, currentSubmitter, submitAnswer, skipSubmitter,
-  answersForJudge, crownWinner, nextRound, extendRounds, standings, isValidParty,
+  answersForJudge, crownWinner, addPlayer, nextRound, extendRounds, standings, isValidParty,
   MIN_PLAYERS, MAX_PLAYERS, MAX_ANSWER_LEN,
 } from '../js/party-engine.js';
 import { PARTY_CARDS } from '../js/party-cards.js';
@@ -117,6 +117,29 @@ is(scrap.winner, null, 'scrap: no winner on a scrapped round');
 scrap = nextRound(scrap);
 is(scrap.phase, 'submit', 'scrap: the party moves on to the next round');
 is(scrap.players.map((p) => p.score), [0, 0, 0], 'scrap: no maples were handed out');
+
+// ---- dealing in a latecomer --------------------------------------------
+let late = party(['Al', 'Bea', 'Cy']);
+throws(() => addPlayer(late, 'Di'), 'latecomer: rejected mid-submit');
+late = submitAnswer(late, 'one');
+late = submitAnswer(late, 'two');
+throws(() => addPlayer(late, 'Di'), 'latecomer: rejected mid-judging');
+late = crownWinner(late, 0);
+late = addPlayer(late, '  Di  ');
+is(late.players.map((p) => p.name), ['Al', 'Bea', 'Cy', 'Di'], 'latecomer: Di joins (trimmed) with the table intact');
+is(late.players[3].score, 0, 'latecomer: Di starts with zero maples');
+is(late.totalRounds, 4, 'latecomer: the party grows by one round');
+is(isValidParty(late), true, 'latecomer: the grown party still validates');
+throws(() => addPlayer(late, 'di'), 'latecomer: duplicate name still rejected');
+late = nextRound(late);
+is(late.queue.includes(3), true, 'latecomer: Di is in the next pass order');
+is(late.queue.length, 3, 'latecomer: next round expects 3 answers');
+{
+  let full = party(Array.from({ length: MAX_PLAYERS }, (_, i) => `P${i}`));
+  while (full.phase === 'submit') full = submitAnswer(full, 'x');
+  full = crownWinner(full, 0);
+  throws(() => addPlayer(full, 'One More'), `latecomer: a full table of ${MAX_PLAYERS} stays full`);
+}
 
 // ---- answer validation -------------------------------------------------
 let v = party(['Al', 'Bea', 'Cy']);

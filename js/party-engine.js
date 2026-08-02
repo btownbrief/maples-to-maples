@@ -26,6 +26,7 @@
  *   skipSubmitter(state)                       -> state (they're in the bathroom)
  *   answersForJudge(state)                     -> shuffled anonymous texts
  *   crownWinner(state, pick)                   -> state (pick indexes answersForJudge)
+ *   addPlayer(state, name)                     -> state (deal a latecomer in, reveal only)
  *   nextRound(state)                           -> state (next card, next judge)
  *   extendRounds(state, extra)                 -> state (from 'over': deal more rounds)
  *   standings(state)                           -> scoreboard, leaders first
@@ -241,6 +242,24 @@ export function crownWinner(state, pick) {
       i === sub.player ? { ...p, score: p.score + 1 } : p),
     phase: 'reveal',
     winner: { player: sub.player, text: sub.text },
+  };
+}
+
+/* Deal a latecomer in between rounds (the reveal screen): they join with
+ * zero maples, enter the pass order from the next round, and the party
+ * grows by one round so the gavel still reaches everyone roughly once. */
+export function addPlayer(state, rawName) {
+  if (state.phase !== 'reveal') throw new Error('deal newcomers in between rounds');
+  if (state.players.length >= MAX_PLAYERS) throw new Error(`the table is full at ${MAX_PLAYERS}`);
+  const name = String(rawName ?? '').trim();
+  if (!name) throw new Error('every player needs a name');
+  if (state.players.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
+    throw new Error(`duplicate player name: ${name}`);
+  }
+  return {
+    ...state,
+    players: state.players.concat([{ name, score: 0 }]),
+    totalRounds: state.totalRounds + 1,
   };
 }
 

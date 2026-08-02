@@ -7,7 +7,7 @@
 // game's moderation queue is never involved.
 import {
   createParty, judgeIndex, currentSubmitter, submitAnswer, skipSubmitter,
-  answersForJudge, crownWinner, nextRound, extendRounds, standings, isValidParty,
+  answersForJudge, crownWinner, addPlayer, nextRound, extendRounds, standings, isValidParty,
   MIN_PLAYERS, MAX_PLAYERS, MAX_ANSWER_LEN,
 } from './party-engine.js';
 import { PARTY_CARDS } from './party-cards.js';
@@ -84,7 +84,22 @@ document.addEventListener('visibilitychange', () => {
     revealed = false;
     render();
   }
+  // Wake locks auto-release when the page hides — take it back on return.
+  if (!document.hidden && party) requestWakeLock();
 });
+
+/* A phone on the table dims and locks mid-party; hold the screen awake
+ * while a game is live. Progressive enhancement — quietly does nothing
+ * where the Wake Lock API is missing or the battery saver refuses. */
+let wakeLock = null;
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try { wakeLock = await navigator.wakeLock.request('screen'); } catch { /* refused — fine */ }
+}
+function releaseWakeLock() {
+  wakeLock?.release().catch(() => {});
+  wakeLock = null;
+}
 
 /* ---------------- screens ---------------- */
 
@@ -164,6 +179,7 @@ $('add-player-form').onsubmit = (e) => {
 $('btn-start').onclick = () => {
   try {
     apply(createParty({ playerNames: lobby, cards: PARTY_CARDS, seed: Date.now() | 0 }));
+    requestWakeLock();
   } catch (err) {
     toast(err.message || 'Could not start the party', 'error');
   }
@@ -176,6 +192,7 @@ $('btn-resume').onclick = () => {
   revealed = false;
   pick = -1;
   render();
+  requestWakeLock();
 };
 
 $('btn-discard').onclick = () => {
@@ -188,6 +205,9 @@ $('btn-discard').onclick = () => {
 
 function renderPass() {
   screen('party-pass');
+  // The prompt is table-public (the judge reads it aloud), so show it here:
+  // everyone waiting on the phone can start cooking up their answer.
+  $('pass-prompt').textContent = party.prompt;
   const who = currentSubmitter(party);
   passFor = who;
   const total = party.players.length - 1; // everyone but the judge
@@ -308,15 +328,53 @@ function renderReveal() {
   screen('party-reveal');
   show($('reveal-winner'), !party.scrapped);
   show($('reveal-scrapped'), party.scrapped);
+  const others = party.scrapped ? [] : party.order
+    .map((i) => party.submissions[i])
+    .filter((s) => s.player !== party.winner.player);
+  show($('reveal-others-wrap'), others.length > 0);
   if (!party.scrapped) {
     $('reveal-prompt').textContent = party.prompt;
     $('reveal-text').textContent = party.winner.text;
     $('reveal-author').textContent = `That was ${nameOf(party.winner.player)}! +1 🍁`;
+    // the "wait, who wrote THAT?" moment — unmask everyone else too
+    const list = $('reveal-others');
+    list.innerHTML = '';
+    for (const s of others) {
+      const li = document.createElement('li');
+      li.className = 'other-row';
+      const text = document.createElement('div');
+      text.textContent = s.text;
+      const who = document.createElement('div');
+      who.className = 'who';
+      who.textContent = `— ${nameOf(s.player)}`;
+      li.append(text, who);
+      list.appendChild(li);
+    }
   }
   scoreList($('reveal-scores'), party);
+  show($('deal-in-row'), party.players.length < MAX_PLAYERS);
+  show($('deal-in-form'), false);
   const lastRound = party.round + 1 >= party.totalRounds;
   $('btn-next-round').textContent = lastRound ? 'See the final standings 🏆' : 'Deal the next card 🍁';
 }
+
+$('btn-deal-in').onclick = () => {
+  show($('deal-in-form'));
+  $('deal-in-name').focus();
+};
+
+$('deal-in-form').onsubmit = (e) => {
+  e.preventDefault();
+  const name = $('deal-in-name').value.trim();
+  if (!name) return;
+  try {
+    apply(addPlayer(party, name));
+    $('deal-in-name').value = '';
+    toast(`${name} is in — they're dealt in next round! 🍁`, 'success');
+  } catch (err) {
+    toast(err.message || 'Could not add them', 'error');
+  }
+};
 
 $('btn-next-round').onclick = () => {
   if (party.phase !== 'reveal') return; // double-fire: already advanced
@@ -325,8 +383,28 @@ $('btn-next-round').onclick = () => {
 
 /* ---------------- game over ---------------- */
 
+/* A brief rain of maple leaves over the final standings. Pure decoration:
+ * skipped under reduced motion, removes itself when done. */
+function mapleShower() {
+  if (reducedMotion.matches || $('maple-shower')) return;
+  const host = document.createElement('div');
+  host.id = 'maple-shower';
+  for (let i = 0; i < 16; i++) {
+    const leaf = document.createElement('span');
+    leaf.textContent = '🍁';
+    leaf.style.left = `${Math.random() * 100}vw`;
+    leaf.style.animationDelay = `${(Math.random() * 1.2).toFixed(2)}s`;
+    leaf.style.animationDuration = `${(2.2 + Math.random() * 1.8).toFixed(2)}s`;
+    leaf.style.fontSize = `${Math.round(16 + Math.random() * 18)}px`;
+    host.appendChild(leaf);
+  }
+  document.body.appendChild(host);
+  setTimeout(() => host.remove(), 4600);
+}
+
 function renderOver() {
   screen('party-over');
+  mapleShower();
   const { leaders } = standings(party);
   const names = leaders.map((l) => l.name);
   const crowned = leaders[0].score > 0;
@@ -350,6 +428,7 @@ $('btn-another-trip').onclick = () => {
 
 $('btn-new-party').onclick = () => {
   clearSave();
+  releaseWakeLock();
   party = null;
   lobby.length = 0;
   renderSetup();

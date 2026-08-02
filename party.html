@@ -62,6 +62,10 @@
 
     <!-- PASS THE PHONE (privacy interstitial before composing) -->
     <section id="party-pass" class="view hidden">
+      <div class="green-card mini">
+        <div class="green-label">the green card — start thinking!</div>
+        <div id="pass-prompt"></div>
+      </div>
       <div class="pass-card">
         <div class="pass-kicker" id="pass-progress"></div>
         <div class="pass-emoji">📲</div>
@@ -134,8 +138,19 @@
         <p>Not enough answers came in to judge this one — round scrapped.
           The card goes back in the box.</p>
       </div>
+      <div id="reveal-others-wrap" class="hidden">
+        <h2 class="section-title">The rest of the table</h2>
+        <ul id="reveal-others" class="others-list"></ul>
+      </div>
       <h2 class="section-title">🍁 The maple count</h2>
       <ol id="reveal-scores" class="score-list"></ol>
+      <div id="deal-in-row">
+        <button class="linkish" id="btn-deal-in">➕ Someone new at the table? Deal them in</button>
+        <form id="deal-in-form" class="form-row hidden">
+          <input type="text" id="deal-in-name" maxlength="20" placeholder="Their name" autocomplete="off">
+          <button type="submit" class="btn ghost">Add</button>
+        </form>
+      </div>
       <button class="btn primary big-btn" id="btn-next-round"></button>
     </section>
 

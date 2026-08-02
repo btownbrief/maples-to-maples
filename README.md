@@ -51,6 +51,9 @@ meetup, a game night): **one phone passes around**, everyone but the judge
 writes an answer to the green card, the judge reads them out loud and
 crowns one, the judge rotates every round. One game is a full trip around
 the table (everyone judges once), 3–16 players, 6–12 is the sweet spot.
+After the crowning, everyone's answers are unmasked (the "who wrote THAT?"
+moment), and a latecomer can be dealt in between rounds. The screen holds
+itself awake while a party is live.
 
 It's entirely on-device: no Supabase, no accounts, no moderation queue —
 party answers never leave the phone and vanish with the party. The current
