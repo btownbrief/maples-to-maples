@@ -51,7 +51,9 @@ function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(party)); } catch { /* storage full/off */ }
 }
 function clearSave() {
-  localStorage.removeItem(SAVE_KEY);
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch (e) { /* storage denied — nothing to clear */ }
 }
 function loadSave() {
   try {
@@ -85,7 +87,7 @@ document.addEventListener('visibilitychange', () => {
     render();
   }
   // Wake locks auto-release when the page hides — take it back on return.
-  if (!document.hidden && party) requestWakeLock();
+  if (!document.hidden && party && party.phase !== 'over') requestWakeLock();
 });
 
 /* A phone on the table dims and locks mid-party; hold the screen awake
@@ -413,6 +415,7 @@ function renderOver() {
     : names.length === 1
       ? `${names[0]} is the Top Maple of the table! 🍁`
       : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} share the crown! 🍁`;
+  releaseWakeLock();
   $('over-line').textContent =
     `${party.totalRounds} rounds played · ${party.players.length} players`;
   scoreList($('over-scores'), party);
@@ -421,6 +424,7 @@ function renderOver() {
 $('btn-another-trip').onclick = () => {
   try {
     apply(extendRounds(party));
+    requestWakeLock();
   } catch (err) {
     toast(err.message || 'Could not deal another lap', 'error');
   }

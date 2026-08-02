@@ -12,7 +12,7 @@ export const PARTY_CARDS = [
   'The secret ingredient in a proper maple creemee',
   'The true reason the bike path curves right there',
   'A perfectly Vermont excuse for missing work',
-  'What flatlanders will simply never understand',
+  'The sixth season Vermont is hiding',
   "The next big Church Street street performer act",
   "What's actually at the bottom of Lake Champlain",
   "Vermont's real state motto",

@@ -107,7 +107,7 @@ export function createParty(options = {}) {
     winner: null,
     scrapped: false,
   };
-  return startRound(base, 0);
+  return startRound(base, 0, 0);
 }
 
 /* Is this a party state this engine can safely drive? Structural check for
@@ -134,30 +134,56 @@ export function isValidParty(s) {
   if (!Array.isArray(s.order)
     || !s.order.every((i) => Number.isInteger(i) && i >= 0 && i < s.submissions.length)) return false;
   if (s.phase !== 'over' && typeof s.prompt !== 'string') return false;
-  if (s.phase === 'submit' && s.queue.length === 0) return false;
+  if (!Number.isInteger(s.judge) || !playerIdx(s.judge)) return false;
+  // Structural honesty: unique names, unique deck cards, and a queue /
+  // submission set that exactly partitions the non-judges.
+  const names = s.players.map((p) => p.name.trim().toLowerCase());
+  if (new Set(names).size !== names.length) return false;
+  if (new Set(s.deck).size !== s.deck.length) return false;
+  if (s.queue.includes(s.judge)) return false;
+  if (new Set(s.queue).size !== s.queue.length) return false;
+  const subPlayers = s.submissions.map((x) => x.player);
+  if (subPlayers.includes(s.judge)) return false;
+  if (new Set(subPlayers).size !== subPlayers.length) return false;
+  if (s.queue.some((q) => subPlayers.includes(q))) return false;
+  if (new Set(s.order).size !== s.order.length) return false;
+  if (s.phase === 'submit') {
+    if (s.queue.length === 0) return false;
+    if (subPlayers.length + s.queue.length !== n - 1) return false;
+  }
   if (s.phase === 'judge' && (s.order.length < 2 || s.order.length !== s.submissions.length)) return false;
-  if (s.phase === 'reveal' && !s.scrapped
-    && !(s.winner && playerIdx(s.winner.player) && typeof s.winner.text === 'string')) return false;
+  if (s.phase === 'reveal' && !s.scrapped) {
+    if (!(s.winner && playerIdx(s.winner.player) && typeof s.winner.text === 'string')) return false;
+    if (!s.submissions.some((x) => x.player === s.winner.player && x.text === s.winner.text)) return false;
+  }
   return true;
 }
 
 /* Deal a fresh round: draw a card (reshuffling a spent deck), rebuild the
  * pass-the-phone queue starting at the judge's left, clear the table. */
-function startRound(state, round) {
+function startRound(state, round, judge) {
   let { deck, rng } = state;
   if (deck.length === 0) {
     const re = shuffle(state.cards.map((_, i) => i), rng);
     deck = re.items;
     rng = re.rng;
+    // A fresh shuffle may put the card we just played right back on top —
+    // rotate it to the bottom so no table ever sees the same prompt twice
+    // in a row.
+    if (deck.length > 1 && state.prompt && state.cards[deck[deck.length - 1]] === state.prompt) {
+      deck = [deck[deck.length - 1], ...deck.slice(0, -1)];
+    }
   }
   const prompt = state.cards[deck[deck.length - 1]];
   const n = state.players.length;
-  const judge = round % n;
+  if (!Number.isInteger(judge)) judge = 0;
+  judge = ((judge % n) + n) % n;
   const queue = [];
   for (let i = 1; i < n; i++) queue.push((judge + i) % n);
   return {
     ...state,
     rng,
+    judge,
     deck: deck.slice(0, -1),
     round,
     phase: 'submit',
@@ -173,7 +199,7 @@ function startRound(state, round) {
 /* ---------------------------------------------------------------- reads */
 
 export function judgeIndex(state) {
-  return state.round % state.players.length;
+  return state.judge;
 }
 
 export function currentSubmitter(state) {
@@ -271,7 +297,9 @@ export function nextRound(state) {
   if (round >= state.totalRounds) {
     return { ...state, round, phase: 'over', prompt: null, queue: [], order: [] };
   }
-  return startRound(state, round);
+  // Rotation is stored, not derived: latecomers extend the table without
+  // rewriting who has already judged (round % n breaks once n changes).
+  return startRound(state, round, (state.judge + 1) % state.players.length);
 }
 
 /* From 'over': deal another lap (default: one more full trip around the
@@ -279,5 +307,5 @@ export function nextRound(state) {
 export function extendRounds(state, extra = state.players.length) {
   if (state.phase !== 'over') throw new Error('party is still going');
   if (!Number.isInteger(extra) || extra < 1) throw new Error('bad extension: ' + extra);
-  return startRound({ ...state, totalRounds: state.totalRounds + extra }, state.round);
+  return startRound({ ...state, totalRounds: state.totalRounds + extra }, state.round, (state.judge + 1) % state.players.length);
 }

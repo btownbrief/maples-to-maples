@@ -258,3 +258,60 @@ if (failures > 0) {
   process.exit(1);
 }
 console.log('\nAll party tests passed.');
+
+// ---- review regression tests (2026-08-02) ------------------------------
+// Latecomer fairness across an extension: with the judge stored rather
+// than derived, everyone — including the latecomer — judges exactly once
+// per full trip after they join.
+{
+  let s = party(['A', 'B', 'C']);
+  const seen = [];
+  const playRound = (st) => {
+    while (st.phase === 'submit') st = submitAnswer(st, 'answer ' + st.queue[0]);
+    st = crownWinner(st, 0);
+    return st;
+  };
+  for (let i = 0; i < 3; i++) { seen.push(judgeIndex(s)); s = playRound(s); s = i < 2 ? nextRound(s) : s; }
+  s = nextRound(s); // -> over
+  s = extendRounds(s, 4);
+  s = playRound(s);       // first extension round ends at reveal…
+  s = addPlayer(s, 'D');  // …which is where latecomers get dealt in
+  s = nextRound(s);
+  const extSeen = [judgeIndex(s)];
+  for (let i = 0; i < 4; i++) { s = playRound(s); s = nextRound(s); if (s.phase !== 'over') extSeen.push(judgeIndex(s)); }
+  is(new Set(extSeen).size, 4, 'after a latecomer joins, four extension rounds get four distinct judges');
+  is(extSeen.includes(3), true, 'the latecomer gets a turn as judge');
+}
+
+// Validator rejects internally corrupt states.
+{
+  let s = party(['A', 'B', 'C', 'D']);
+  is(isValidParty({ ...s, queue: [s.queue[0], s.queue[0]] }), false, 'duplicate players in the queue are rejected');
+  is(isValidParty({ ...s, queue: [...s.queue, judgeIndex(s)] }), false, 'the judge in the queue is rejected');
+  is(isValidParty({ ...s, players: s.players.map((p) => ({ ...p, name: 'Same' })) }), false, 'duplicate player names are rejected');
+  is(isValidParty({ ...s, deck: [...s.deck.slice(0, -1), s.deck[0]] }), false, 'duplicate deck cards are rejected');
+  is(isValidParty({ ...s, judge: undefined }), false, 'a save without a stored judge is rejected');
+  let j = s;
+  while (j.phase === 'submit') j = submitAnswer(j, 'x' + j.queue[0]);
+  const w = crownWinner(j, 0);
+  is(isValidParty({ ...w, winner: { player: w.winner.player, text: 'never submitted' } }), false,
+    'a winner that matches no submission is rejected');
+}
+
+// Reshuffle boundary: the same prompt never repeats back-to-back, on any seed.
+{
+  for (let seed = 0; seed < 20; seed++) {
+    let s = createParty({ playerNames: ['A', 'B', 'C'], cards: CARDS.slice(0, 45), seed });
+    s = { ...s, totalRounds: 95 };
+    let prev = null, repeat = false;
+    for (let i = 0; i < 94; i++) {
+      if (s.prompt === prev) { repeat = true; break; }
+      prev = s.prompt;
+      while (s.phase === 'submit') s = submitAnswer(s, 'a' + s.queue[0]);
+      s = crownWinner(s, 0);
+      s = nextRound(s);
+    }
+    if (repeat) { failures += 1; console.error('✗ prompt repeated back-to-back at seed ' + seed); break; }
+  }
+  console.log('✓ no back-to-back prompt repeats across 20 seeds through multiple reshuffles');
+}
