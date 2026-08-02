@@ -69,7 +69,9 @@ body {
 }
 .linkish {
   background: none; border: none; color: var(--accent);
-  font: inherit; text-decoration: underline; cursor: pointer; padding: 0;
+  font: inherit; text-decoration: underline; cursor: pointer;
+  padding: 12px 8px; margin: -4px 0; min-height: 44px;
+  display: inline-flex; align-items: center;
 }
 
 .phase-banner {
@@ -435,4 +437,108 @@ textarea:focus, input:focus { outline: 2px solid var(--accent); border-color: tr
   #vote-progress-track.animating #vote-progress-fill { transition: none; }
   .btn:active,
   .swipe-btn:active { transform: none; }
+}
+
+/* ---------------- party mode (party.html) ---------------- */
+#party-chip { font-size: 12px; color: var(--accent); font-weight: 700; }
+
+.big-btn { width: 100%; padding: 14px 16px; font-size: 16px; margin-top: 12px; }
+.party-btn-row { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+
+#add-player-form { gap: 8px; }
+#add-player-form input { flex: 1; }
+#player-list {
+  list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px;
+}
+.player-chip {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--panel-2); border-radius: 999px;
+  padding: 7px 8px 7px 14px; font-size: 14px; font-weight: 700;
+}
+.chip-x {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 13px; padding: 2px 6px; border-radius: 50%;
+}
+.chip-x:active { color: var(--bad); }
+
+/* the pass-the-phone interstitial */
+.pass-card {
+  background: var(--panel); border-radius: var(--radius);
+  padding: 34px 20px 24px; text-align: center; margin-top: 8px;
+}
+.pass-kicker {
+  font-size: 12px; color: var(--muted); font-weight: 700;
+  letter-spacing: .4px; margin-bottom: 18px;
+}
+.pass-emoji { font-size: 46px; }
+.pass-line { font-size: 15px; color: var(--muted); margin-top: 12px; }
+.pass-name {
+  font-size: 34px; font-weight: 900; color: var(--accent);
+  margin: 4px 0 10px; overflow-wrap: anywhere;
+}
+.pass-card .linkish { margin-top: 14px; }
+
+/* the judge's spread of anonymous answers */
+#judge-answers {
+  list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 12px 0;
+}
+.answer-option {
+  width: 100%; text-align: left; cursor: pointer;
+  background: var(--paper); color: var(--paper-ink);
+  border: 2px solid transparent; border-radius: var(--radius);
+  padding: 13px 14px; font-size: 16px; font-weight: 600; line-height: 1.35;
+  font-family: inherit;
+}
+.answer-option.picked {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 182, 46, .25);
+}
+.answer-option:active { transform: scale(.985); }
+
+/* the maple count */
+.score-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.score-row {
+  background: var(--panel); border-radius: 10px;
+  padding: 10px 14px; display: flex; align-items: center; gap: 12px; font-size: 15px;
+}
+.score-row .rank { font-weight: 900; color: var(--muted); min-width: 22px; text-align: center; }
+.score-row .score-name { flex: 1; font-weight: 700; overflow-wrap: anywhere; }
+.score-row .score-maples { font-size: 14px; letter-spacing: 1px; color: var(--muted); }
+.score-row.leading {
+  background: linear-gradient(135deg, #3c2f10, #2a3a24);
+  border: 1px solid rgba(255, 182, 46, .5);
+}
+
+/* the party-mode pointer on the weekly page */
+#party-callout {
+  margin-top: 26px; background: linear-gradient(120deg, var(--panel), #26392f);
+  border: 1px solid rgba(255, 182, 46, .18); border-radius: var(--radius);
+  padding: 14px 16px; font-size: 14px; line-height: 1.45;
+}
+#party-callout a { color: var(--accent); font-weight: 800; }
+
+/* everyone else's answers, unmasked on the reveal */
+.others-list { list-style: none; display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
+.other-row {
+  background: var(--panel); border-radius: 10px;
+  padding: 10px 14px; font-size: 14px; line-height: 1.35;
+}
+.other-row .who { color: var(--muted); font-size: 12px; margin-top: 3px; }
+
+/* dealing in a latecomer between rounds */
+#deal-in-row { text-align: center; margin: 14px 0 2px; }
+#deal-in-form { margin-top: 10px; gap: 8px; text-align: left; }
+#deal-in-form input { flex: 1; }
+
+/* the final-standings maple shower */
+#maple-shower {
+  position: fixed; inset: 0; pointer-events: none; z-index: 40; overflow: hidden;
+}
+#maple-shower span { position: absolute; top: -34px; animation: maple-fall linear both; }
+@keyframes maple-fall {
+  from { transform: translateY(0) rotate(0deg); opacity: 1; }
+  to { transform: translateY(108vh) rotate(320deg); opacity: .85; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #maple-shower span { animation: none !important; display: none; }
 }
