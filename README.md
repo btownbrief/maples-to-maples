@@ -44,6 +44,27 @@ Setup steps in [`supabase/SETUP.md`](supabase/SETUP.md).
   moderation + the green card queue)
 - `data/green-cards.md` — the 12 launch prompts (seed SQL in SETUP.md)
 
+## Party Mode (`party.html`)
+
+The in-person, big-group way to play — built for a real table (a coffee
+meetup, a game night): **one phone passes around**, everyone but the judge
+writes an answer to the green card, the judge reads them out loud and
+crowns one, the judge rotates every round. One game is a full trip around
+the table (everyone judges once), 3–16 players, 6–12 is the sweet spot.
+
+It's entirely on-device: no Supabase, no accounts, no moderation queue —
+party answers never leave the phone and vanish with the party. The current
+game is kept in localStorage so an accidental refresh doesn't kill game
+night. It has its own green-card deck (`js/party-cards.js`) so game night
+never spoils or drains the weekly queue.
+
+- `js/party-engine.js` — PURE party rules (fleet engine convention: plain
+  JSON state, seeded RNG inside the state, no DOM/network/clock); tested
+  by `scripts/test-party.mjs` (`node`, no framework)
+- `js/party.js` + `party.html` — the screens (setup, pass-the-phone,
+  compose, judge, reveal, standings); UI only
+- `js/party-cards.js` — the party deck of green cards
+
 GitHub Actions:
 
 - `deploy.yml` — GitHub Pages deploy on push

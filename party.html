@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14212e">
+<title>MAPLES TO MAPLES — Party Mode</title>
+<meta name="description" content="The pass-the-phone party game for a big Burlington table. One phone, one green card, everybody plays — the judge crowns the Top Maple.">
+<meta property="og:title" content="MAPLES TO MAPLES — Party Mode">
+<meta property="og:description" content="The pass-the-phone party game for a big Burlington table. One phone, one green card, everybody plays — the judge crowns the Top Maple.">
+<meta property="og:image" content="https://play.btownbrief.com/maples-to-maples/icon-180.png">
+<meta property="og:url" content="https://play.btownbrief.com/maples-to-maples/party.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://play.btownbrief.com/maples-to-maples/icon-180.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div id="logo">🍁 MAPLES <span>TO MAPLES</span></div>
+    <div id="party-chip">🎉 party mode</div>
+  </header>
+
+  <main id="views">
+    <!-- SETUP -->
+    <section id="party-setup" class="view">
+      <div class="green-card hero-card">
+        <div class="green-label">party mode</div>
+        <div>One phone. One green card. The whole table plays.</div>
+      </div>
+      <p class="hint">Pass this phone around: everyone but the judge writes an answer,
+        the judge reads them out loud and crowns one. 🍁 The judge rotates every
+        round — one game is a full trip around the table. 6–12 players is the
+        sweet spot.</p>
+
+      <div id="resume-box" class="notice hidden">
+        <div class="big">☕</div>
+        <p id="resume-line"></p>
+        <div class="party-btn-row">
+          <button class="btn primary" id="btn-resume">Pick it back up</button>
+          <button class="btn ghost" id="btn-discard">Start fresh</button>
+        </div>
+      </div>
+
+      <div id="setup-form">
+        <h2 class="section-title">Who's at the table?</h2>
+        <form id="add-player-form" class="form-row">
+          <input type="text" id="player-name" maxlength="20" placeholder="Add a player…" autocomplete="off">
+          <button type="submit" class="btn ghost" id="btn-add">Add</button>
+        </form>
+        <ul id="player-list"></ul>
+        <div class="hint" id="player-count-line">Add at least 3 players to start.</div>
+        <button class="btn primary big-btn" id="btn-start" disabled>Deal the first card 🍁</button>
+      </div>
+
+      <p class="hint">Looking for the weekly game the whole town plays?
+        <a href="./">It's right here →</a></p>
+    </section>
+
+    <!-- PASS THE PHONE (privacy interstitial before composing) -->
+    <section id="party-pass" class="view hidden">
+      <div class="pass-card">
+        <div class="pass-kicker" id="pass-progress"></div>
+        <div class="pass-emoji">📲</div>
+        <div class="pass-line">Pass the phone to</div>
+        <div class="pass-name" id="pass-name"></div>
+        <button class="btn primary big-btn" id="btn-im-here"></button>
+        <button class="linkish" id="btn-skip"></button>
+      </div>
+    </section>
+
+    <!-- COMPOSE AN ANSWER -->
+    <section id="party-compose" class="view hidden">
+      <div class="phase-banner" id="compose-banner"></div>
+      <div class="green-card hero-card">
+        <div class="green-label">the green card</div>
+        <div id="compose-prompt"></div>
+      </div>
+      <form id="compose-form">
+        <textarea id="compose-text" maxlength="80" rows="2"
+          placeholder="Play the funniest card at the table…" required></textarea>
+        <div class="form-row">
+          <span id="compose-chars">80</span>
+          <button type="submit" class="btn primary" id="compose-submit">Play your card 🍁</button>
+        </div>
+      </form>
+      <div class="hint">Keep it secret — hand the phone back face-down when you're done.</div>
+    </section>
+
+    <!-- HAND TO THE JUDGE -->
+    <section id="party-judge-pass" class="view hidden">
+      <div class="pass-card">
+        <div class="pass-kicker">all answers are in</div>
+        <div class="pass-emoji">⚖️</div>
+        <div class="pass-line">Hand the phone to the judge</div>
+        <div class="pass-name" id="judge-pass-name"></div>
+        <button class="btn primary big-btn" id="btn-im-judge"></button>
+      </div>
+    </section>
+
+    <!-- JUDGING -->
+    <section id="party-judge" class="view hidden">
+      <div class="phase-banner vote" id="judge-banner"></div>
+      <div class="green-card slim judging-prompt">
+        <div class="green-label">the green card</div>
+        <div id="judge-prompt"></div>
+      </div>
+      <div class="hint">Read every answer out loud — with feeling — then crown one.</div>
+      <ul id="judge-answers"></ul>
+      <button class="btn primary big-btn" id="btn-crown" disabled>Crown it 🍁</button>
+    </section>
+
+    <!-- REVEAL + SCOREBOARD -->
+    <section id="party-reveal" class="view hidden">
+      <div id="reveal-winner" class="hidden">
+        <div class="green-card slim">
+          <div class="green-label" id="reveal-prompt-label">the green card</div>
+          <div id="reveal-prompt"></div>
+        </div>
+        <div class="result-row winner reveal-row">
+          <div class="rank">🍁</div>
+          <div class="body">
+            <div class="winner-tag">ROUND WINNER</div>
+            <div class="text" id="reveal-text"></div>
+            <div class="meta" id="reveal-author"></div>
+          </div>
+        </div>
+      </div>
+      <div id="reveal-scrapped" class="notice hidden">
+        <div class="big">🤷</div>
+        <p>Not enough answers came in to judge this one — round scrapped.
+          The card goes back in the box.</p>
+      </div>
+      <h2 class="section-title">🍁 The maple count</h2>
+      <ol id="reveal-scores" class="score-list"></ol>
+      <button class="btn primary big-btn" id="btn-next-round"></button>
+    </section>
+
+    <!-- GAME OVER -->
+    <section id="party-over" class="view hidden">
+      <div class="notice">
+        <div class="big">🏆</div>
+        <p id="over-champion"></p>
+        <p class="hint" id="over-line"></p>
+      </div>
+      <h2 class="section-title">Final standings</h2>
+      <ol id="over-scores" class="score-list"></ol>
+      <div class="party-btn-row">
+        <button class="btn primary big-btn" id="btn-another-trip">Another trip around the table 🔄</button>
+        <button class="btn ghost big-btn" id="btn-new-party">New party</button>
+      </div>
+    </section>
+  </main>
+
+  <footer id="foot">
+    A Btown Games production · <a href="./">Weekly game →</a> · <a href="https://play.btownbrief.com/" target="_blank" rel="noopener">More games →</a>
+  </footer>
+
+  <div id="toast" class="hidden" role="status" aria-live="polite"></div>
+</div>
+<script type="module" src="js/party.js"></script>
+<script src="https://play.btownbrief.com/ticker.js" defer></script>
+</body>
+</html>
