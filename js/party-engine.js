@@ -23,7 +23,9 @@
  *   judgeIndex(state)                          -> player index judging now
  *   currentSubmitter(state)                    -> player index holding the phone, or null
  *   submitAnswer(state, text)                  -> state (records, passes the phone)
+ *   submitAnswerFor(state, player, text)       -> state (online: any seat, any order)
  *   skipSubmitter(state)                       -> state (they're in the bathroom)
+ *   skipPlayer(state, player)                  -> state (online: judge skips a ghost)
  *   answersForJudge(state)                     -> shuffled anonymous texts
  *   crownWinner(state, pick)                   -> state (pick indexes answersForJudge)
  *   addPlayer(state, name)                     -> state (deal a latecomer in, reveal only)
@@ -227,20 +229,43 @@ export function standings(state) {
 
 export function submitAnswer(state, rawText) {
   if (state.phase !== 'submit') throw new Error('not accepting answers now');
+  return submitAnswerFor(state, state.queue[0], rawText);
+}
+
+/* Seat-aware submit for online play, where answers land in any order. A
+ * player whose answer already landed gets the SAME state object back — that
+ * idempotence is what makes the UI's version-conflict retry loop safe to
+ * re-apply against a fresher state. */
+export function submitAnswerFor(state, player, rawText) {
+  if (state.phase !== 'submit') throw new Error('not accepting answers now');
+  if (!Number.isInteger(player) || player < 0 || player >= state.players.length) {
+    throw new Error('bad player: ' + player);
+  }
+  if (state.submissions.some((x) => x.player === player)) return state;
+  if (player === state.judge) throw new Error('the judge does not answer');
+  if (!state.queue.includes(player)) throw new Error('answers are closed for this seat');
   const text = String(rawText ?? '').trim();
   if (!text) throw new Error('empty_answer');
   if (text.length > MAX_ANSWER_LEN) throw new Error('answer_too_long');
   const next = {
     ...state,
-    submissions: state.submissions.concat([{ player: state.queue[0], text }]),
-    queue: state.queue.slice(1),
+    submissions: state.submissions.concat([{ player, text }]),
+    queue: state.queue.filter((p) => p !== player),
   };
   return next.queue.length ? next : closeSubmissions(next);
 }
 
 export function skipSubmitter(state) {
   if (state.phase !== 'submit') throw new Error('not accepting answers now');
-  const next = { ...state, queue: state.queue.slice(1) };
+  return skipPlayer(state, state.queue[0]);
+}
+
+/* Online: drop a player from this round's queue (their phone went dark).
+ * Skipping someone already answered or already skipped is a no-op. */
+export function skipPlayer(state, player) {
+  if (state.phase !== 'submit') throw new Error('not accepting answers now');
+  if (!state.queue.includes(player)) return state;
+  const next = { ...state, queue: state.queue.filter((p) => p !== player) };
   return next.queue.length ? next : closeSubmissions(next);
 }
 

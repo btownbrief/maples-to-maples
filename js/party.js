@@ -1,16 +1,23 @@
-// MAPLES TO MAPLES — Party Mode UI. One shared phone at a big table:
-// pass-to-submit, judge crowns, maples counted. UI ONLY — every rule lives
-// in the pure engine (js/party-engine.js); this file just wires screens to
-// it and keeps the current party in localStorage so a pocketed phone or an
-// accidental refresh never kills game night. No network, no Supabase —
-// party answers stay on the device and vanish with the party, so the weekly
-// game's moderation queue is never involved.
+// MAPLES TO MAPLES — Party Mode UI. UI ONLY — every rule lives in the pure
+// engine (js/party-engine.js); this file just wires screens to it. Two ways
+// to play:
+//  - pass-the-phone: one shared phone at a big table (3-16). Fully
+//    on-device — no network, answers stay on the phone, and the party lives
+//    in localStorage so a pocketed phone never kills game night.
+//  - online: 3-4 players, each on their own phone, synced through the
+//    fleet's shared rooms backend (js/rooms.js). The whole engine state —
+//    answers included — reaches every phone; the honest UI keeps answers
+//    anonymous until the reveal (a devtools snoop could peek — the accepted
+//    fleet tradeoff for friendly games). Neither mode touches the weekly
+//    game's Supabase moderation queue.
 import {
-  createParty, judgeIndex, currentSubmitter, submitAnswer, skipSubmitter,
+  createParty, judgeIndex, currentSubmitter, submitAnswer, submitAnswerFor,
+  skipSubmitter, skipPlayer,
   answersForJudge, crownWinner, addPlayer, nextRound, extendRounds, standings, isValidParty,
   MIN_PLAYERS, MAX_PLAYERS, MAX_ANSWER_LEN,
 } from './party-engine.js';
 import { PARTY_CARDS } from './party-cards.js';
+import { OnlineMatch, clearSession, getName, savedSession } from './rooms.js';
 
 const $ = (id) => document.getElementById(id);
 const show = (el, on = true) => el.classList.toggle('hidden', !on);
@@ -47,6 +54,12 @@ let composeFor = null; // which player the open compose screen belongs to
 let passFor = null;    // which player the pass screen is waiting on
 let draft = '';        // their typed-so-far answer (survives the privacy latch)
 
+const GAME = 'maples-to-maples';
+let online = null;     // { match } — this phone is engine player match.seat
+let draftRound = -1;   // which round the draft belongs to (online repaints mid-typing)
+let pushing = false;   // one online push in flight at a time
+let leaveArmed = false;
+
 function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(party)); } catch { /* storage full/off */ }
 }
@@ -65,7 +78,9 @@ function loadSave() {
   return null;
 }
 
-/* Every engine transition funnels through here: update, persist, redraw. */
+/* Every PASS-MODE engine transition funnels through here: update, persist,
+ * redraw. Online transitions go through pushOnline instead — the room, not
+ * localStorage, is the truth there. */
 function apply(next) {
   party = next;
   revealed = false;
@@ -81,7 +96,7 @@ function apply(next) {
 // screen so whoever picks it up next can't read a private answer — but keep
 // the typer's draft so an accidental screen-lock doesn't eat their card.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && revealed) {
+  if (!online && document.hidden && revealed) {
     if (party?.phase === 'submit') draft = $('compose-text').value;
     revealed = false;
     render();
@@ -105,17 +120,40 @@ function releaseWakeLock() {
 
 /* ---------------- screens ---------------- */
 
-const SCREENS = ['party-setup', 'party-pass', 'party-compose', 'party-judge-pass', 'party-judge', 'party-reveal', 'party-over'];
+const SCREENS = ['party-setup', 'party-pass', 'party-compose', 'party-judge-pass', 'party-judge', 'party-reveal', 'party-over', 'onlinePanel', 'lobby', 'party-wait'];
 function screen(id) {
   for (const s of SCREENS) show($(s), s === id);
 }
 
-function nameOf(i) { return party.players[i].name; }
+/* Online, the engine state carries placeholder names ("Maple 1") because the
+ * host deals before anyone joins — real names live on the room's seats. */
+function nameOf(i) {
+  if (online) {
+    if (i === online.match.seat) return 'You';
+    return online.match.seats.find((s) => s.seat === i)?.name || `Maple ${i + 1}`;
+  }
+  return party.players[i].name;
+}
 
 function render() {
+  if (online) return renderOnline();
   if (!party) return renderSetup();
   if (party.phase === 'submit') return revealed ? renderCompose() : renderPass();
   if (party.phase === 'judge') return revealed ? renderJudge() : renderJudgePass();
+  if (party.phase === 'reveal') return renderReveal();
+  return renderOver();
+}
+
+/* Online, this phone IS one seat: no pass screens, no privacy latches —
+ * render my perspective of the shared state (fleet rule 2). */
+function renderOnline() {
+  if (!party) return renderSetup();
+  if (online.match.status === 'over' && party.phase !== 'over') return renderTableGone();
+  const me = online.match.seat;
+  if (party.phase === 'submit') {
+    return me !== party.judge && party.queue.includes(me) ? renderCompose() : renderWait();
+  }
+  if (party.phase === 'judge') return me === party.judge ? renderJudge() : renderWait();
   if (party.phase === 'reveal') return renderReveal();
   return renderOver();
 }
@@ -126,6 +164,7 @@ const lobby = []; // names being gathered before the party starts
 
 function renderSetup() {
   screen('party-setup');
+  refreshRejoin();
   const saved = loadSave();
   show($('resume-box'), !!saved);
   show($('setup-form'), !saved);
@@ -236,21 +275,38 @@ $('btn-skip').onclick = () => {
 
 function renderCompose() {
   screen('party-compose');
-  const who = currentSubmitter(party);
+  const who = online ? online.match.seat : currentSubmitter(party);
   composeFor = who;
-  $('compose-banner').textContent = `🍁 ${nameOf(who)}, play your card — nobody peek!`;
+  $('compose-banner').textContent = online
+    ? '🍁 Play your card — the table is waiting!'
+    : `🍁 ${nameOf(who)}, play your card — nobody peek!`;
+  $('compose-hint').textContent = online
+    ? 'The judge reads it unsigned — nobody learns it was yours until the reveal.'
+    : "Keep it secret — hand the phone back face-down when you're done.";
   $('compose-prompt').textContent = party.prompt;
-  $('compose-text').value = draft;
-  $('compose-chars').textContent = MAX_ANSWER_LEN - draft.length;
-  $('compose-text').focus();
+  // Online, other players' answers landing repaint this screen mid-typing —
+  // restore the draft (dropping one left over from an earlier round).
+  const text = online && draftRound !== party.round ? '' : draft;
+  if ($('compose-text').value !== text) $('compose-text').value = text;
+  $('compose-chars').textContent = MAX_ANSWER_LEN - text.length;
+  if (document.activeElement !== $('compose-text')) $('compose-text').focus();
 }
 
 $('compose-text').oninput = () => {
-  $('compose-chars').textContent = MAX_ANSWER_LEN - $('compose-text').value.length;
+  draft = $('compose-text').value;
+  draftRound = party ? party.round : -1;
+  $('compose-chars').textContent = MAX_ANSWER_LEN - draft.length;
 };
 
 $('compose-form').onsubmit = (e) => {
   e.preventDefault();
+  if (online) {
+    const text = $('compose-text').value;
+    if (!text.trim()) return toast('Write a little something first!', 'error');
+    draft = '';
+    pushOnline((s) => submitAnswerFor(s, online.match.seat, text));
+    return;
+  }
   // A double-fired submit must never hand this answer to the NEXT player in
   // the queue: only accept it for the player the screen was opened for.
   if (currentSubmitter(party) !== composeFor) return;
@@ -277,7 +333,12 @@ $('btn-im-judge').onclick = () => {
 
 function renderJudge() {
   screen('party-judge');
-  $('judge-banner').textContent = `⚖️ ${nameOf(judgeIndex(party))} holds the gavel`;
+  $('judge-banner').textContent = online
+    ? '⚖️ You hold the gavel'
+    : `⚖️ ${nameOf(judgeIndex(party))} holds the gavel`;
+  $('judge-hint').textContent = online
+    ? 'The whole table is reading these too — take your time, then crown one.'
+    : 'Read every answer out loud — with feeling — then crown one.';
   $('judge-prompt').textContent = party.prompt;
   const list = $('judge-answers');
   list.innerHTML = '';
@@ -296,6 +357,11 @@ function renderJudge() {
 
 $('btn-crown').onclick = () => {
   if (pick < 0) return;
+  if (online) {
+    const chosen = pick;
+    pick = -1;
+    return pushOnline((s) => crownWinner(s, chosen));
+  }
   try {
     apply(crownWinner(party, pick));
   } catch (err) {
@@ -317,7 +383,7 @@ function scoreList(el, s) {
     rank.textContent = String(i + 1);
     const name = document.createElement('span');
     name.className = 'score-name';
-    name.textContent = r.name;
+    name.textContent = online ? nameOf(r.player) : r.name;
     const maples = document.createElement('span');
     maples.className = 'score-maples';
     maples.textContent = r.score > 0 ? '🍁'.repeat(Math.min(r.score, 8)) + (r.score > 8 ? ` ×${r.score}` : '') : '—';
@@ -354,7 +420,7 @@ function renderReveal() {
     }
   }
   scoreList($('reveal-scores'), party);
-  show($('deal-in-row'), party.players.length < MAX_PLAYERS);
+  show($('deal-in-row'), !online && party.players.length < MAX_PLAYERS);
   show($('deal-in-form'), false);
   const lastRound = party.round + 1 >= party.totalRounds;
   $('btn-next-round').textContent = lastRound ? 'See the final standings 🏆' : 'Deal the next card 🍁';
@@ -380,6 +446,7 @@ $('deal-in-form').onsubmit = (e) => {
 
 $('btn-next-round').onclick = () => {
   if (party.phase !== 'reveal') return; // double-fire: already advanced
+  if (online) return pushOnline((s) => nextRound(s));
   apply(nextRound(party));
 };
 
@@ -408,20 +475,24 @@ function renderOver() {
   screen('party-over');
   mapleShower();
   const { leaders } = standings(party);
-  const names = leaders.map((l) => l.name);
+  const names = leaders.map((l) => (online ? nameOf(l.player) : l.name));
   const crowned = leaders[0].score > 0;
   $('over-champion').textContent = !crowned
     ? 'No maples were handed out — Burlington remains undefeated.'
     : names.length === 1
-      ? `${names[0]} is the Top Maple of the table! 🍁`
+      ? (names[0] === 'You'
+        ? "You're the Top Maple of the table! 🍁"
+        : `${names[0]} is the Top Maple of the table! 🍁`)
       : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} share the crown! 🍁`;
   releaseWakeLock();
   $('over-line').textContent =
     `${party.totalRounds} rounds played · ${party.players.length} players`;
   scoreList($('over-scores'), party);
+  $('btn-new-party').textContent = online ? 'Leave the table' : 'New party';
 }
 
 $('btn-another-trip').onclick = () => {
+  if (online) return pushOnline((s) => extendRounds(s));
   try {
     apply(extendRounds(party));
     requestWakeLock();
@@ -431,6 +502,7 @@ $('btn-another-trip').onclick = () => {
 };
 
 $('btn-new-party').onclick = () => {
+  if (online) return leaveTable(false);
   clearSave();
   releaseWakeLock();
   party = null;
@@ -438,5 +510,344 @@ $('btn-new-party').onclick = () => {
   renderSetup();
 };
 
+/* ---------------- online play (the rooms layer) ---------------- */
+
+/* Apply an engine step to the FRESHEST room state and push it. During the
+ * submit phase several phones push at once, so all but one hit
+ * version_conflict — rooms.js refetches the server truth on conflict, and
+ * because the engine's seat-aware mutators are idempotent we can safely
+ * re-apply this phone's action to the fresh state and try again. */
+async function pushOnline(applyFn) {
+  if (!online || pushing) return;
+  pushing = true;
+  try {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      let next;
+      try {
+        next = applyFn(online.match.state);
+      } catch {
+        break; // the table already moved past this action — adopt the truth
+      }
+      if (next === online.match.state) break; // no-op: it already landed
+      try {
+        await online.match.push(next, { over: next.phase === 'over' });
+        break;
+      } catch (err) {
+        if (err?.code !== 'version_conflict') {
+          toast(friendly(err), 'error');
+          break;
+        }
+        if (attempt === 4) toast('The table is busy — try again!', 'error');
+      }
+    }
+  } finally {
+    pushing = false;
+    if (online) {
+      party = online.match.state;
+      render();
+    }
+  }
+}
+
+const FRIENDLY_ERRORS = {
+  not_found: 'No table has that code — check the four characters.',
+  room_full: 'That table is already full.',
+  room_started: 'That party has already dealt its first card.',
+  not_ready: "Online play isn't switched on yet — check back soon!",
+  offline: "Can't reach the sugarhouse — are you online?",
+  opponent_left: 'Someone left the table.',
+};
+function friendly(err) {
+  if (err?.code === 'wrong_game') return `That code belongs to ${String(err.detail || 'another game').replace(/-/g, ' ')}.`;
+  return FRIENDLY_ERRORS[err?.code] || 'The signal drifted through the sugarbush. Try again.';
+}
+
+function renderWait() {
+  screen('party-wait');
+  const s = party;
+  const me = online.match.seat;
+  $('wait-prompt').textContent = s.prompt;
+  const total = s.players.length - 1;
+  $('wait-progress').textContent =
+    `round ${s.round + 1} of ${s.totalRounds} · ${me === s.judge ? 'you hold the gavel' : `${nameOf(s.judge)} judges`}`;
+  const list = $('wait-list');
+  list.innerHTML = '';
+  show($('wait-answers'), false);
+  $('btn-leave-table').textContent = 'Leave the table';
+  leaveArmed = false;
+  if (s.phase === 'submit') {
+    const inCount = total - s.queue.length;
+    $('wait-emoji').textContent = me === s.judge ? '⚖️' : '🍁';
+    $('wait-line').textContent = me === s.judge
+      ? `The table is writing — ${inCount} of ${total} answers in.`
+      : `Your card is in! ${inCount} of ${total} answers on the table.`;
+    const dark = new Set(online.match.opponents().filter((o) => o.away || o.left).map((o) => o.seat));
+    for (const p of s.queue) {
+      const li = document.createElement('li');
+      li.className = 'wait-row';
+      const label = document.createElement('span');
+      label.textContent = `${nameOf(p)} is still writing…${dark.has(p) ? ' 🌙' : ''}`;
+      li.appendChild(label);
+      if (me === s.judge) {
+        const skip = document.createElement('button');
+        skip.type = 'button';
+        skip.className = 'linkish';
+        skip.textContent = 'skip them';
+        skip.onclick = () => pushOnline((cur) => skipPlayer(cur, p));
+        li.appendChild(skip);
+      }
+      list.appendChild(li);
+    }
+  } else { // judge phase, and this phone is not the judge
+    $('wait-emoji').textContent = '⚖️';
+    $('wait-line').textContent = `${nameOf(s.judge)} is reading the answers…`;
+    const ul = $('wait-answers');
+    ul.innerHTML = '';
+    for (const text of answersForJudge(s)) {
+      const li = document.createElement('li');
+      li.className = 'other-row';
+      li.textContent = text;
+      ul.appendChild(li);
+    }
+    show(ul);
+  }
+}
+
+function renderTableGone() {
+  screen('party-wait');
+  $('wait-prompt').textContent = party.prompt || '—';
+  $('wait-progress').textContent = 'the table broke up';
+  $('wait-emoji').textContent = '🍂';
+  $('wait-line').textContent = 'Someone left, so this party is over.';
+  $('wait-list').innerHTML = '';
+  show($('wait-answers'), false);
+  $('btn-leave-table').textContent = 'Back to the porch';
+}
+
+function leaveTable(confirmNeeded) {
+  if (!online) return;
+  if (confirmNeeded && !leaveArmed && online.match.status === 'playing') {
+    leaveArmed = true;
+    $('btn-leave-table').textContent = 'Really leave? The party ends for everyone';
+    setTimeout(() => {
+      leaveArmed = false;
+      if (online) render();
+    }, 2600);
+    return;
+  }
+  const match = online.match;
+  online = null;
+  leaveArmed = false;
+  match.leave();
+  releaseWakeLock();
+  party = null;
+  draft = '';
+  renderSetup();
+}
+
+$('btn-leave-table').onclick = () => leaveTable(true);
+
+/* ---- host / join panel ---- */
+
+let panelIntent = 'host';
+let selectedSeats = 3;
+let lobbyMatch = null;
+
+$('hostBtn').onclick = () => openPanel('host');
+$('joinBtn').onclick = () => openPanel('join');
+$('opCancel').onclick = () => renderSetup();
+$('opGo').onclick = onlineGo;
+$('lobbyCancel').onclick = cancelLobby;
+$('rejoinBtn').onclick = rejoinTable;
+
+document.querySelectorAll('.seat-btn').forEach((button) => {
+  button.onclick = () => {
+    selectedSeats = +button.dataset.seats;
+    document.querySelectorAll('.seat-btn').forEach((choice) => {
+      const chosen = choice === button;
+      choice.classList.toggle('selected', chosen);
+      choice.setAttribute('aria-pressed', String(chosen));
+    });
+  };
+});
+
+$('opCode').oninput = () => {
+  $('opCode').value = $('opCode').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+};
+[$('opName'), $('opCode')].forEach((input) => input.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    onlineGo();
+  }
+}));
+
+function openPanel(intent) {
+  panelIntent = intent;
+  $('opTitle').textContent = intent === 'host' ? 'Host a table' : 'Join a table';
+  $('opGo').textContent = intent === 'host' ? 'Get a code' : 'Pull up a chair';
+  show($('opSeatsWrap'), intent === 'host');
+  show($('opCodeWrap'), intent !== 'host');
+  show($('opError'), false);
+  $('opName').value = $('opName').value || getName();
+  screen('onlinePanel');
+  (intent === 'join' && $('opName').value ? $('opCode') : $('opName')).focus();
+}
+
+function opFail(message) {
+  $('opError').textContent = message;
+  show($('opError'));
+}
+
+async function onlineGo() {
+  if ($('opGo').disabled) return;
+  const name = $('opName').value.trim();
+  if (!name) {
+    opFail('Every player needs a name.');
+    $('opName').focus();
+    return;
+  }
+  $('opGo').disabled = true;
+  show($('opError'), false);
+  try {
+    let match;
+    if (panelIntent === 'host') {
+      match = await OnlineMatch.create({
+        game: GAME,
+        name,
+        seats: selectedSeats,
+        state: createParty({
+          playerNames: Array.from({ length: selectedSeats }, (_, i) => `Maple ${i + 1}`),
+          cards: PARTY_CARDS,
+          seed: Date.now() | 0,
+        }),
+      });
+    } else {
+      const code = $('opCode').value.trim();
+      if (code.length !== 4) {
+        opFail('The table code is 4 characters.');
+        $('opCode').focus();
+        return;
+      }
+      match = await OnlineMatch.join({ game: GAME, code, name });
+    }
+    if (match.status === 'waiting') openLobby(match);
+    else enterOnlineGame(match);
+  } catch (err) {
+    opFail(friendly(err));
+  } finally {
+    $('opGo').disabled = false;
+  }
+}
+
+/* ---- lobby ---- */
+
+function renderLobby(match) {
+  $('lobbyCode').textContent = match.code;
+  const list = $('lobbyNames');
+  list.innerHTML = '';
+  const total = match.maxSeats || match.state.players.length;
+  for (let seat = 0; seat < total; seat++) {
+    const joined = match.seats.find((entry) => entry.seat === seat);
+    const li = document.createElement('li');
+    li.textContent = joined ? `🍁 ${joined.name}` : '☕ Waiting for a player…';
+    list.appendChild(li);
+  }
+}
+
+function openLobby(match) {
+  if (lobbyMatch && lobbyMatch !== match) lobbyMatch.stop();
+  lobbyMatch = match;
+  $('lobbyHint').textContent = 'The rest of the table joins with this code or your invite link.';
+  renderLobby(match);
+  screen('lobby');
+  match.start({
+    onStatus: (status) => {
+      if (status === 'playing') enterOnlineGame(match);
+      else if (status === 'over') $('lobbyHint').textContent = 'Someone left before the first card. Host a fresh table.';
+    },
+    onPresence: () => renderLobby(match),
+    onError: () => {},
+  });
+}
+
+function cancelLobby() {
+  lobbyMatch?.leave();
+  lobbyMatch = null;
+  renderSetup();
+}
+
+$('inviteBtn').onclick = async () => {
+  if (!lobbyMatch) return;
+  const url = `${location.origin}${location.pathname}?join=${lobbyMatch.code}`;
+  const text = `Pull up a chair — Maples to Maples, live! 🍁 ${url}`;
+  try {
+    if (navigator.share && /Mobi|Android|iPhone|iPad/.test(navigator.userAgent)) {
+      await navigator.share({ text });
+    } else {
+      await navigator.clipboard.writeText(url);
+      $('inviteBtn').textContent = '✓ Link copied';
+      setTimeout(() => { $('inviteBtn').textContent = '📲 Send an invite'; }, 1800);
+    }
+  } catch { /* closing a share sheet is harmless */ }
+};
+
+/* ---- rejoin + entering the game ---- */
+
+async function rejoinTable() {
+  $('rejoinBtn').disabled = true;
+  try {
+    const match = await OnlineMatch.resume({ game: GAME });
+    if (match.status === 'waiting') openLobby(match);
+    else enterOnlineGame(match);
+  } catch (err) {
+    if (['not_found', 'not_seated', 'room_started'].includes(err?.code)) {
+      clearSession(GAME);
+      refreshRejoin();
+    } else {
+      toast(friendly(err), 'error');
+    }
+  } finally {
+    $('rejoinBtn').disabled = false;
+  }
+}
+
+function refreshRejoin() {
+  const saved = savedSession(GAME);
+  show($('rejoinBtn'), !!saved);
+  if (saved) $('rejoinBtn').textContent = `↩ Rejoin your table (${saved.code})`;
+}
+
+function enterOnlineGame(match) {
+  lobbyMatch = null;
+  online = { match };
+  party = match.state;
+  revealed = false;
+  pick = -1;
+  draft = '';
+  draftRound = -1;
+  leaveArmed = false;
+  requestWakeLock();
+  render();
+  match.start({
+    onState: (remoteState) => {
+      party = remoteState;
+      pick = -1;
+      render();
+    },
+    onStatus: () => render(),
+    onPresence: () => render(),
+    onError: () => {},
+  });
+}
+
 /* ---------------- boot ---------------- */
 render();
+
+(() => {
+  const code = new URLSearchParams(location.search).get('join');
+  if (!code || !/^[A-Za-z0-9]{4}$/.test(code)) return;
+  history.replaceState(null, '', location.pathname);
+  openPanel('join');
+  $('opCode').value = code.toUpperCase();
+  if ($('opName').value) $('opCode').focus();
+})();

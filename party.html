@@ -56,8 +56,72 @@
         <button class="btn primary big-btn" id="btn-start" disabled>Deal the first card 🍁</button>
       </div>
 
+      <div id="online-box">
+        <h2 class="section-title">Everyone on their own phone?</h2>
+        <p class="hint">Play live over the internet — 3 or 4 players, one 4-letter table code.
+          Online answers sync through the shared game server until the reveal.</p>
+        <div class="party-btn-row">
+          <button class="btn primary" id="hostBtn">Host a table 🍁</button>
+          <button class="btn ghost" id="joinBtn">Join with a code</button>
+        </div>
+        <button class="linkish hidden" id="rejoinBtn"></button>
+      </div>
+
       <p class="hint">Looking for the weekly game the whole town plays?
         <a href="./">It's right here →</a></p>
+    </section>
+
+    <!-- ONLINE: HOST / JOIN -->
+    <section id="onlinePanel" class="view hidden">
+      <div class="pass-card">
+        <h2 class="section-title" id="opTitle">Host a table</h2>
+        <input type="text" id="opName" maxlength="20" placeholder="Your name" autocomplete="off">
+        <div id="opSeatsWrap">
+          <div class="hint">How many phones at the table?</div>
+          <div class="party-btn-row">
+            <button type="button" class="btn ghost seat-btn selected" data-seats="3" aria-pressed="true">3 players</button>
+            <button type="button" class="btn ghost seat-btn" data-seats="4" aria-pressed="false">4 players</button>
+          </div>
+        </div>
+        <div id="opCodeWrap" class="hidden">
+          <input type="text" id="opCode" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters">
+        </div>
+        <p id="opError" class="hint op-error hidden"></p>
+        <div class="party-btn-row">
+          <button class="btn primary" id="opGo">Get a code</button>
+          <button class="btn ghost" id="opCancel">Back</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ONLINE: LOBBY -->
+    <section id="lobby" class="view hidden">
+      <div class="pass-card">
+        <div class="pass-kicker">your table code</div>
+        <div class="pass-name" id="lobbyCode"></div>
+        <p class="hint" id="lobbyHint">The rest of the table joins with this code or your invite link.</p>
+        <ul id="lobbyNames" class="score-list"></ul>
+        <div class="party-btn-row">
+          <button class="btn primary" id="inviteBtn">📲 Send an invite</button>
+          <button class="btn ghost" id="lobbyCancel">Cancel</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ONLINE: WAITING / WATCHING -->
+    <section id="party-wait" class="view hidden">
+      <div class="green-card mini">
+        <div class="green-label">the green card</div>
+        <div id="wait-prompt"></div>
+      </div>
+      <div class="pass-card">
+        <div class="pass-kicker" id="wait-progress"></div>
+        <div class="pass-emoji" id="wait-emoji">✍️</div>
+        <div class="pass-line" id="wait-line"></div>
+        <ul id="wait-list"></ul>
+        <ul id="wait-answers" class="others-list hidden"></ul>
+      </div>
+      <button class="linkish" id="btn-leave-table">Leave the table</button>
     </section>
 
     <!-- PASS THE PHONE (privacy interstitial before composing) -->
@@ -91,7 +155,7 @@
           <button type="submit" class="btn primary" id="compose-submit">Play your card 🍁</button>
         </div>
       </form>
-      <div class="hint">Keep it secret — hand the phone back face-down when you're done.</div>
+      <div class="hint" id="compose-hint">Keep it secret — hand the phone back face-down when you're done.</div>
     </section>
 
     <!-- HAND TO THE JUDGE -->
@@ -112,7 +176,7 @@
         <div class="green-label">the green card</div>
         <div id="judge-prompt"></div>
       </div>
-      <div class="hint">Read every answer out loud — with feeling — then crown one.</div>
+      <div class="hint" id="judge-hint">Read every answer out loud — with feeling — then crown one.</div>
       <ul id="judge-answers"></ul>
       <button class="btn primary big-btn" id="btn-crown" disabled>Crown it 🍁</button>
     </section>

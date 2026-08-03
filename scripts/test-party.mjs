@@ -4,7 +4,8 @@
 // 12-player trip around the table, determinism, serialization, skips,
 // scrapped rounds, and the immutability rule.
 import {
-  createParty, judgeIndex, currentSubmitter, submitAnswer, skipSubmitter,
+  createParty, judgeIndex, currentSubmitter, submitAnswer, submitAnswerFor,
+  skipSubmitter, skipPlayer,
   answersForJudge, crownWinner, addPlayer, nextRound, extendRounds, standings, isValidParty,
   MIN_PLAYERS, MAX_PLAYERS, MAX_ANSWER_LEN,
 } from '../js/party-engine.js';
@@ -253,12 +254,6 @@ is(isValidParty({ version: 1, players: [] }), false, 'a truncated save is reject
   is(isValidParty({ ...crowned, winner: null }), false, 'an un-scrapped reveal with no winner is rejected');
 }
 
-if (failures > 0) {
-  console.error(`\n${failures} test(s) FAILED`);
-  process.exit(1);
-}
-console.log('\nAll party tests passed.');
-
 // ---- review regression tests (2026-08-02) ------------------------------
 // Latecomer fairness across an extension: with the judge stored rather
 // than derived, everyone — including the latecomer — judges exactly once
@@ -315,3 +310,34 @@ console.log('\nAll party tests passed.');
   }
   console.log('✓ no back-to-back prompt repeats across 20 seeds through multiple reshuffles');
 }
+
+// ---- seat-aware online API (submitAnswerFor / skipPlayer) --------------
+{
+  const s4 = party(['Al', 'Bea', 'Cy', 'Di']); // judge 0; queue [1, 2, 3]
+  const outOfOrder = submitAnswerFor(s4, 3, 'last seat first');
+  is(outOfOrder.submissions[0].player, 3, 'online: answers may land from any seat, in any order');
+  is(outOfOrder.queue, [1, 2], 'online: the queue sheds exactly that seat');
+  is(submitAnswerFor(outOfOrder, 3, 'changed my mind') === outOfOrder, true,
+    'online: re-submitting an already-landed seat is a same-object no-op');
+  throws(() => submitAnswerFor(s4, judgeIndex(s4), 'gavel words'), 'online: the judge cannot answer');
+  throws(() => submitAnswerFor(s4, 9, 'ghost seat'), 'online: an out-of-range seat is rejected');
+  let closed = submitAnswerFor(outOfOrder, 1, 'one');
+  closed = submitAnswerFor(closed, 2, 'two');
+  is(closed.phase, 'judge', 'online: the round closes when the last seat submits, any order');
+  is(isValidParty(closed), true, 'online: out-of-order submissions still validate');
+
+  const midSkip = skipPlayer(s4, 1);
+  throws(() => submitAnswerFor(midSkip, 1, 'too late'), 'online: a skipped seat cannot answer this round');
+  let sk = submitAnswerFor(s4, 1, 'made it');
+  sk = submitAnswerFor(sk, 2, 'me too');
+  const skDone = skipPlayer(sk, 3);
+  is(skDone.phase, 'judge', 'online: skipping the last silent seat closes the round');
+  is(skDone.submissions.length, 2, 'online: the skipped seat contributes no answer');
+  is(skipPlayer(sk, 1) === sk, true, 'online: skipping a seat that already answered is a no-op');
+}
+
+if (failures > 0) {
+  console.error(`\n${failures} test(s) FAILED`);
+  process.exit(1);
+}
+console.log('\nAll party tests passed.');
