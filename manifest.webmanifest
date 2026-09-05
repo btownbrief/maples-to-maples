@@ -1,0 +1,22 @@
+{
+  "name": "Maples to Maples",
+  "short_name": "Maples to Maples",
+  "description": "Maples to Maples. A Btown Games production.",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#14212e",
+  "theme_color": "#14212e",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}
